@@ -9,9 +9,18 @@ use bevy::{
         tonemapping::Tonemapping,
         Skybox,
     },
-    pbr::{ExtendedMaterial, OpaqueRendererMethod},
+    pbr::{
+        wireframe::{Wireframe, WireframePlugin},
+        ExtendedMaterial, OpaqueRendererMethod,
+    },
     prelude::*,
-    render::mesh::VertexAttributeValues,
+    render::{
+        mesh::VertexAttributeValues,
+        settings::{
+            RenderCreation, WgpuFeatures, WgpuSettings,
+        },
+        RenderPlugin,
+    },
 };
 use bevy_panorbit_camera::{
     PanOrbitCamera, PanOrbitCameraPlugin,
@@ -23,7 +32,17 @@ use water_material::*;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.set(RenderPlugin {
+                render_creation: RenderCreation::Automatic(
+                    WgpuSettings {
+                        features:
+                            WgpuFeatures::POLYGON_MODE_LINE,
+                        ..default()
+                    },
+                ),
+                ..default()
+            }),
+            WireframePlugin,
             PanOrbitCameraPlugin,
             MaterialPlugin::<
                 ExtendedMaterial<
@@ -33,6 +52,7 @@ fn main() {
             >::default(),
         ))
         .add_systems(Startup, startup)
+        .add_systems(Update, toggle_wireframe)
         .run();
 }
 
@@ -185,15 +205,18 @@ fn startup(
         terrain.compute_normals();
     }
 
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(terrain),
-        material: materials.add(StandardMaterial {
-            base_color: Color::WHITE,
-            perceptual_roughness: 0.9,
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(terrain),
+            material: materials.add(StandardMaterial {
+                base_color: Color::WHITE,
+                perceptual_roughness: 0.9,
+                ..default()
+            }),
             ..default()
-        }),
-        ..default()
-    });
+        },
+        Terrain,
+    ));
 
     // water
     let water = Mesh::from(
@@ -240,4 +263,29 @@ fn startup(
         }),
         ..default()
     });
+}
+
+#[derive(Component)]
+struct Terrain;
+
+fn toggle_wireframe(
+    mut commands: Commands,
+    landscapes_wireframes: Query<
+        Entity,
+        (With<Terrain>, With<Wireframe>),
+    >,
+    landscapes: Query<
+        Entity,
+        (With<Terrain>, Without<Wireframe>),
+    >,
+    input: Res<ButtonInput<KeyCode>>,
+) {
+    if input.just_pressed(KeyCode::Space) {
+        for terrain in &landscapes {
+            commands.entity(terrain).insert(Wireframe);
+        }
+        for terrain in &landscapes_wireframes {
+            commands.entity(terrain).remove::<Wireframe>();
+        }
+    }
 }
