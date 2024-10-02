@@ -1,5 +1,6 @@
 use bevy::{
     color::palettes::tailwind::*,
+    ecs::world::Command,
     pbr::wireframe::{Wireframe, WireframePlugin},
     prelude::*,
     render::{
@@ -13,6 +14,7 @@ use bevy::{
         },
         RenderPlugin,
     },
+    utils::HashMap,
 };
 use bevy_panorbit_camera::{
     PanOrbitCamera, PanOrbitCameraPlugin,
@@ -22,6 +24,7 @@ use std::f32::consts::PI;
 
 fn main() {
     App::new()
+        .insert_resource(TerrainStore(HashMap::default()))
         .add_plugins((
             DefaultPlugins.set(RenderPlugin {
                 render_creation: RenderCreation::Automatic(
@@ -79,70 +82,15 @@ fn startup(
         },
         Ship,
     ));
-
-    let terrain_height = 70.;
-    let noise = BasicMulti::<Perlin>::new(900);
-
-    let mut terrain = Mesh::from(
-        Plane3d::default()
-            .mesh()
-            .size(1000.0, 1000.0)
-            .subdivisions(200),
-    );
-
-    if let Some(VertexAttributeValues::Float32x3(
-        positions,
-    )) = terrain.attribute_mut(Mesh::ATTRIBUTE_POSITION)
-    {
-        for pos in positions.iter_mut() {
-            let val = noise.get([
-                pos[0] as f64 / 300.,
-                pos[2] as f64 / 300.,
-            ]);
-
-            pos[1] = val as f32 * terrain_height;
-        }
-
-        let colors: Vec<[f32; 4]> = positions
-            .iter()
-            .map(|[_, g, _]| {
-                let g = *g / terrain_height * 2.;
-
-                if g > 0.8 {
-                    (Color::LinearRgba(LinearRgba {
-                        red: 20.,
-                        green: 20.,
-                        blue: 20.,
-                        alpha: 1.,
-                    }))
-                    .to_linear()
-                    .to_f32_array()
-                } else if g > 0.3 {
-                    Color::from(AMBER_800)
-                        .to_linear()
-                        .to_f32_array()
-                } else if g < -0.8 {
-                    Color::BLACK.to_linear().to_f32_array()
-                } else {
-                    (Color::from(GREEN_400).to_linear())
-                        .to_f32_array()
-                }
-            })
-            .collect();
-        terrain.insert_attribute(
-            Mesh::ATTRIBUTE_COLOR,
-            colors,
-        );
-    }
-    terrain.compute_normals();
-    commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(terrain),
-            material: materials.add(Color::WHITE),
-            ..default()
-        },
-        Terrain,
-    ));
+    commands.add(SpawnTerrain(IVec2::new(-1, -1)));
+    commands.add(SpawnTerrain(IVec2::new(-1, 0)));
+    commands.add(SpawnTerrain(IVec2::new(-1, 1)));
+    commands.add(SpawnTerrain(IVec2::new(0, -1)));
+    commands.add(SpawnTerrain(IVec2::new(0, 0)));
+    commands.add(SpawnTerrain(IVec2::new(0, 1)));
+    commands.add(SpawnTerrain(IVec2::new(1, -1)));
+    commands.add(SpawnTerrain(IVec2::new(1, 0)));
+    commands.add(SpawnTerrain(IVec2::new(1, 1)));
 
     // directional 'sun' light
     commands.spawn(DirectionalLightBundle {
@@ -158,6 +106,123 @@ fn startup(
         },
         ..default()
     });
+}
+
+#[derive(Resource)]
+struct TerrainStore(HashMap<IVec2, Handle<Mesh>>);
+
+struct SpawnTerrain(IVec2);
+
+impl Command for SpawnTerrain {
+    fn apply(self, world: &mut World) {
+        if world
+            .get_resource_mut::<TerrainStore>()
+            .expect("TerrainStore to be available")
+            .0
+            .get(&self.0)
+            .is_some()
+        {
+            // mesh already exists
+            // do nothing for now
+            warn!("mesh already exists");
+            return;
+        };
+
+        let terrain_height = 70.;
+        let noise = BasicMulti::<Perlin>::new(900);
+        let mesh_size = 1000.;
+
+        let mut terrain = Mesh::from(
+            Plane3d::default()
+                .mesh()
+                .size(mesh_size, mesh_size)
+                .subdivisions(200),
+        );
+
+        if let Some(VertexAttributeValues::Float32x3(
+            positions,
+        )) =
+            terrain.attribute_mut(Mesh::ATTRIBUTE_POSITION)
+        {
+            for pos in positions.iter_mut() {
+                let val = noise.get([
+                    (pos[0] as f64
+                        + (mesh_size as f64
+                            * self.0.x as f64))
+                        / 300.,
+                    (pos[2] as f64
+                        + (mesh_size as f64
+                            * self.0.y as f64))
+                        / 300.,
+                ]);
+
+                pos[1] = val as f32 * terrain_height;
+            }
+
+            let colors: Vec<[f32; 4]> = positions
+                .iter()
+                .map(|[_, g, _]| {
+                    let g = *g / terrain_height * 2.;
+
+                    if g > 0.8 {
+                        (Color::LinearRgba(LinearRgba {
+                            red: 20.,
+                            green: 20.,
+                            blue: 20.,
+                            alpha: 1.,
+                        }))
+                        .to_linear()
+                        .to_f32_array()
+                    } else if g > 0.3 {
+                        Color::from(AMBER_800)
+                            .to_linear()
+                            .to_f32_array()
+                    } else if g < -0.8 {
+                        Color::BLACK
+                            .to_linear()
+                            .to_f32_array()
+                    } else {
+                        (Color::from(GREEN_400).to_linear())
+                            .to_f32_array()
+                    }
+                })
+                .collect();
+            terrain.insert_attribute(
+                Mesh::ATTRIBUTE_COLOR,
+                colors,
+            );
+        }
+        terrain.compute_normals();
+
+        let mesh = world
+            .get_resource_mut::<Assets<Mesh>>()
+            .expect("meshes db to be available")
+            .add(terrain);
+        let material = world
+            .get_resource_mut::<Assets<StandardMaterial>>()
+            .expect("StandardMaterial db to be available")
+            .add(Color::WHITE);
+
+        world
+            .get_resource_mut::<TerrainStore>()
+            .expect("TerrainStore to be available")
+            .0
+            .insert(self.0, mesh.clone());
+
+        world.spawn((
+            PbrBundle {
+                mesh,
+                material,
+                transform: Transform::from_xyz(
+                    self.0.x as f32 * mesh_size,
+                    0.,
+                    self.0.y as f32 * mesh_size,
+                ),
+                ..default()
+            },
+            Terrain,
+        ));
+    }
 }
 
 #[derive(Component)]
