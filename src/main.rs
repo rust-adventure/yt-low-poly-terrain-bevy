@@ -44,9 +44,13 @@ fn main() {
         .add_systems(Startup, startup)
         .add_systems(
             Update,
-            (toggle_wireframe, sync_camera_to_ship),
+            (
+                toggle_wireframe,
+                sync_camera_to_ship,
+                manage_chunks,
+                control_ship,
+            ),
         )
-        .add_systems(Update, control_ship)
         .run();
 }
 
@@ -124,7 +128,7 @@ impl Command for SpawnTerrain {
         {
             // mesh already exists
             // do nothing for now
-            warn!("mesh already exists");
+            warn!("mesh {} already exists", self.0);
             return;
         };
 
@@ -222,6 +226,69 @@ impl Command for SpawnTerrain {
             },
             Terrain,
         ));
+    }
+}
+
+fn manage_chunks(
+    mut commands: Commands,
+    mut current_chunk: Local<IVec2>,
+    ship: Query<&Transform, With<Ship>>,
+    mut terrain_store: ResMut<TerrainStore>,
+    terrain_entities: Query<
+        (Entity, &Handle<Mesh>),
+        With<Terrain>,
+    >,
+) {
+    // same as mesh_size for us
+    let chunk_size = 1000.;
+
+    let Ok(transform) = ship.get_single() else {
+        warn!("no ship!");
+        return;
+    };
+
+    let xz = (transform.translation.xz() / chunk_size)
+        .trunc()
+        .as_ivec2();
+
+    if *current_chunk != xz {
+        *current_chunk = xz;
+        let chunks_to_render = [
+            *current_chunk + IVec2::new(-1, -1),
+            *current_chunk + IVec2::new(-1, 0),
+            *current_chunk + IVec2::new(-1, 1),
+            *current_chunk + IVec2::new(0, -1),
+            *current_chunk + IVec2::new(0, 0),
+            *current_chunk + IVec2::new(0, 1),
+            *current_chunk + IVec2::new(1, -1),
+            *current_chunk + IVec2::new(1, 0),
+            *current_chunk + IVec2::new(1, 1),
+        ];
+        // extract_if is perfect here, but its nightly
+        let chunks_to_despawn: Vec<(IVec2, Handle<Mesh>)> =
+            terrain_store
+                .0
+                .clone()
+                .into_iter()
+                .filter(|(key, _)| {
+                    !chunks_to_render.contains(&key)
+                })
+                .collect();
+
+        for (chunk, mesh) in chunks_to_despawn {
+            let Some((entity, _)) = terrain_entities
+                .iter()
+                .find(|(_, handle)| handle == &&mesh)
+            else {
+                continue;
+            };
+            commands.entity(entity).despawn_recursive();
+            terrain_store.0.remove(&chunk);
+        }
+
+        for chunk in chunks_to_render {
+            commands.add(SpawnTerrain(chunk));
+        }
     }
 }
 
