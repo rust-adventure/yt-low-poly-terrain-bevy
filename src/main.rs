@@ -29,9 +29,9 @@ fn main() {
             DefaultPlugins.set(RenderPlugin {
                 render_creation: RenderCreation::Automatic(
                     WgpuSettings {
-                        // WARN this is a native only feature. It will not work with webgl or webgpu
-                        features:
-                            WgpuFeatures::POLYGON_MODE_LINE,
+                        // // WARN this is a native only feature. It will not work with webgl or webgpu
+                        // features:
+                        //     WgpuFeatures::POLYGON_MODE_LINE,
                         ..default()
                     },
                 ),

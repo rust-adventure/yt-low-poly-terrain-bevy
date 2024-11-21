@@ -1,5 +1,5 @@
 [package]
-name = "yt-low-poly-terrain-bevy-live"
+name = "low-poly-terrain-bevy"
 version = "0.1.0"
 edition = "2021"
 
