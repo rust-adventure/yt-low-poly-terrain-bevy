@@ -325,9 +325,12 @@ struct ShipCam;
 
 fn control_ship(
     input: Res<ButtonInput<KeyCode>>,
+    touches: Res<Touches>,
     mut ships: Query<&mut Transform, With<Ship>>,
 ) {
-    let mut direction = Vec2::new(0., 0.);
+    let mut direction = Vec2::ZERO;
+
+    // Keyboard support
     if input.pressed(KeyCode::KeyW) {
         direction.y += 1.;
     }
@@ -340,7 +343,28 @@ fn control_ship(
     if input.pressed(KeyCode::KeyD) {
         direction.x -= 1.;
     }
-    for mut ship in &mut ships {
+
+    // Touch support
+    let mut touch_data = Vec::new();
+    for touch in touches.iter() {
+        touch_data.push((touch.id(), touch.position(), touch.previous_position()));
+    }
+
+    if touch_data.len() == 2 {
+        let (_, first_pos, first_prev_pos) = touch_data[0];
+        let (_, second_pos, second_prev_pos) = touch_data[1];
+
+        let current_midpoint = (first_pos + second_pos) / 2.0;
+        let prev_midpoint = (first_prev_pos + second_prev_pos) / 2.0;
+        let drag_vector = current_midpoint - prev_midpoint;
+
+        // Use drag vector to determine ship direction
+        direction.x -= drag_vector.x * 0.1; // Adjust sensitivity as needed
+        direction.y += drag_vector.y * 0.1;
+    }
+
+    // Update ship position
+    for mut ship in ships.iter_mut() {
         ship.translation.x += direction.x * 1.;
         ship.translation.z += direction.y * 5.;
     }
