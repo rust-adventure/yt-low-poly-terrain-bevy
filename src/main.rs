@@ -338,10 +338,10 @@ fn control_ship(
         direction.y -= 1.;
     }
     if input.pressed(KeyCode::KeyA) {
-        direction.x += 1.;
+        direction.x += 5.;
     }
     if input.pressed(KeyCode::KeyD) {
-        direction.x -= 1.;
+        direction.x -= 5.;
     }
 
     // Touch support
@@ -359,14 +359,14 @@ fn control_ship(
         let drag_vector = current_midpoint - prev_midpoint;
 
         // Use drag vector to determine ship direction
-        direction.x -= drag_vector.x * 0.1; // Adjust sensitivity as needed
-        direction.y += drag_vector.y * 0.1;
+        direction.x -= drag_vector.x;
+        direction.y += drag_vector.y;
     }
 
     // Update ship position
     for mut ship in ships.iter_mut() {
-        ship.translation.x += direction.x * 1.;
-        ship.translation.z += direction.y * 5.;
+        ship.translation.x += direction.x;
+        ship.translation.z += direction.y;
     }
 }
 
