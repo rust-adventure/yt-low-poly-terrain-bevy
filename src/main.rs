@@ -68,48 +68,42 @@ fn startup(
     });
 
     commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 20., 75.0)
-                .looking_at(Vec3::new(0., 1., 0.), Vec3::Y),
-            ..default()
-        },
+        Camera3d::default(),
+        Transform::from_xyz(0.0, 20., 75.0)
+            .looking_at(Vec3::new(0., 1., 0.), Vec3::Y),
         PanOrbitCamera::default(),
         ShipCam,
     ));
 
     commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Cuboid::default()),
-            material: debug_material.clone(),
-            transform: Transform::from_xyz(0., 10., 0.),
-            ..default()
-        },
+        Mesh3d(meshes.add(Cuboid::default())),
+        MeshMaterial3d(debug_material.clone()),
+        Transform::from_xyz(0., 10., 0.),
         Ship,
     ));
-    commands.add(SpawnTerrain(IVec2::new(-1, -1)));
-    commands.add(SpawnTerrain(IVec2::new(-1, 0)));
-    commands.add(SpawnTerrain(IVec2::new(-1, 1)));
-    commands.add(SpawnTerrain(IVec2::new(0, -1)));
-    commands.add(SpawnTerrain(IVec2::new(0, 0)));
-    commands.add(SpawnTerrain(IVec2::new(0, 1)));
-    commands.add(SpawnTerrain(IVec2::new(1, -1)));
-    commands.add(SpawnTerrain(IVec2::new(1, 0)));
-    commands.add(SpawnTerrain(IVec2::new(1, 1)));
+    commands.queue(SpawnTerrain(IVec2::new(-1, -1)));
+    commands.queue(SpawnTerrain(IVec2::new(-1, 0)));
+    commands.queue(SpawnTerrain(IVec2::new(-1, 1)));
+    commands.queue(SpawnTerrain(IVec2::new(0, -1)));
+    commands.queue(SpawnTerrain(IVec2::new(0, 0)));
+    commands.queue(SpawnTerrain(IVec2::new(0, 1)));
+    commands.queue(SpawnTerrain(IVec2::new(1, -1)));
+    commands.queue(SpawnTerrain(IVec2::new(1, 0)));
+    commands.queue(SpawnTerrain(IVec2::new(1, 1)));
 
     // directional 'sun' light
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
+    commands.spawn((
+        DirectionalLight {
             illuminance: light_consts::lux::OVERCAST_DAY,
             shadows_enabled: true,
             ..default()
         },
-        transform: Transform {
+        Transform {
             translation: Vec3::new(0.0, 2.0, 0.0),
             rotation: Quat::from_rotation_x(-PI / 4.),
             ..default()
         },
-        ..default()
-    });
+    ));
 }
 
 #[derive(Resource)]
@@ -214,16 +208,13 @@ impl Command for SpawnTerrain {
             .insert(self.0, mesh.clone());
 
         world.spawn((
-            PbrBundle {
-                mesh,
-                material,
-                transform: Transform::from_xyz(
-                    self.0.x as f32 * mesh_size,
-                    0.,
-                    self.0.y as f32 * mesh_size,
-                ),
-                ..default()
-            },
+            Mesh3d(mesh),
+            MeshMaterial3d(material),
+            Transform::from_xyz(
+                self.0.x as f32 * mesh_size,
+                0.,
+                self.0.y as f32 * mesh_size,
+            ),
             Terrain,
         ));
     }
@@ -235,7 +226,7 @@ fn manage_chunks(
     ship: Query<&Transform, With<Ship>>,
     mut terrain_store: ResMut<TerrainStore>,
     terrain_entities: Query<
-        (Entity, &Handle<Mesh>),
+        (Entity, &Mesh3d),
         With<Terrain>,
     >,
 ) {
@@ -278,7 +269,7 @@ fn manage_chunks(
         for (chunk, mesh) in chunks_to_despawn {
             let Some((entity, _)) = terrain_entities
                 .iter()
-                .find(|(_, handle)| handle == &&mesh)
+                .find(|(_, handle)| ***handle == mesh)
             else {
                 continue;
             };
@@ -287,7 +278,7 @@ fn manage_chunks(
         }
 
         for chunk in chunks_to_render {
-            commands.add(SpawnTerrain(chunk));
+            commands.queue(SpawnTerrain(chunk));
         }
     }
 }
