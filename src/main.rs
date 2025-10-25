@@ -45,7 +45,7 @@ fn main() {
             WireframePlugin::default(),
             // PanOrbitCameraPlugin,
             AsyncPlugin,
-            FpsOverlayPlugin::default(),
+            // FpsOverlayPlugin::default(),
         ))
         .add_systems(Startup, startup)
         .add_systems(
@@ -244,7 +244,7 @@ fn control_ship(
     }
     for mut ship in &mut ships {
         ship.translation.x += direction.x * 1.;
-        ship.translation.z += direction.y * 5.;
+        ship.translation.z -= direction.y * 5.;
     }
 }
 
@@ -262,8 +262,8 @@ fn sync_camera_to_ship(
 
     cam.translation = Vec3::new(
         ship.translation.x,
-        ship.translation.y + 10.,
-        ship.translation.z + 60.,
+        ship.translation.y + 20.,
+        ship.translation.z + 75.,
     );
     cam.look_at(ship.translation, Vec3::Y);
 }
