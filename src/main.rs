@@ -8,17 +8,17 @@ use bevy::{
     platform::collections::HashMap,
     prelude::*,
     render::{
+        RenderPlugin,
         render_resource::{
             Extent3d, TextureDimension, TextureFormat,
         },
         settings::{
             RenderCreation, WgpuFeatures, WgpuSettings,
         },
-        RenderPlugin,
     },
 };
 use bevy_malek_async::{
-    async_access, AsyncPlugin, WorldIdRes,
+    AsyncPlugin, WorldIdRes, async_access,
 };
 use noiz::prelude::*;
 use std::f32::consts::PI;
@@ -237,10 +237,10 @@ fn control_ship(
         direction.y -= 1.;
     }
     if input.pressed(KeyCode::KeyA) {
-        direction.x += 1.;
+        direction.x -= 1.;
     }
     if input.pressed(KeyCode::KeyD) {
-        direction.x -= 1.;
+        direction.x += 1.;
     }
     for mut ship in &mut ships {
         ship.translation.x += direction.x * 1.;
